@@ -18,6 +18,8 @@ set( PROJECT_SOURCES
         QStyleIconLister.cpp
 		QStyleStandardIcon.h
 		QStyleStandardIcon.cpp
+		FlowLayout.h
+		FlowLayout.cpp
 )
 
 if ( 6 LESS_EQUAL ${QT_VERSION_MAJOR} )
