@@ -2,7 +2,6 @@
 
 #include <QApplication>
 #include <QPainter>
-#include <QPen>
 
 QIcon StandardIcon::get( StdId id )
 {

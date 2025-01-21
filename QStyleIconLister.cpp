@@ -1,9 +1,12 @@
+/**************************************************************************************************
+ * QStyleIconLister - a small simple program for showing all in-built Icons of Qt.
+ * -> using the Qt example "flowlayout" for laying out the buttons.
+ *************************************************************************************************/
 #include "QStyleStandardIcon.h"
 #include "flowlayout.h"
 
 #include <QApplication>
 #include <QComboBox>
-#include <QGridLayout>
 #include <QLabel>
 #include <QPainter>
 #include <QPushButton>
@@ -12,6 +15,7 @@
 #include <QTabWidget>
 #include <QToolButton>
 
+// Standard Pixmap strings
 const char *strings[] = {
 	"SP_TitleBarMenuButton",
 	"SP_TitleBarMinButton",
@@ -94,6 +98,7 @@ const char *strings[] = {
 	"SP_TabCloseButton",
 };
 
+// Theme Icon strings
 const char *TIs[] = {
 	"AddressBookNew",
 	"ApplicationExit",
@@ -250,24 +255,39 @@ const char *TIs[] = {
 int main( int argc, char *argv[] )
 {
 	QApplication a( argc, argv );
-	QComboBox	*cb = new QComboBox;
+	QWidget		 w;
+	// First, we build a small QStyle-Selector, so the QStyle can be switched
+	auto		*cb = new QComboBox;
 	cb->addItems( QStyleFactory::keys() );
 	cb->connect( cb, &QComboBox::currentTextChanged,
 				 [ &a ]( const QString &text ) { a.setStyle( QStyleFactory::create( text ) ); } );
-	QHBoxLayout *hla = new QHBoxLayout;
+	auto *hla = new QHBoxLayout;
 	hla->addWidget( new QLabel( "Style:" ) );
 	hla->addWidget( cb );
 	hla->addStretch();
+	auto pb = new QPushButton( "only Icons" );
+	pb->setCheckable( true );
+	w.connect( pb, &QPushButton::clicked,
+			   [ &w, pb ]( bool checked )
+			   {
+				   pb->setText( checked ? "Icons with text" : "only Icons" );
+				   for ( auto tb : w.findChildren< QToolButton * >() )
+					   tb->setToolButtonStyle( checked ? Qt::ToolButtonIconOnly
+													   : Qt::ToolButtonTextBesideIcon );
+			   } );
+	hla->addWidget( pb );
 	constexpr const char *ns[] = { "unknown", "bright scheme", "dark scheme" };
 	int					  s	   = static_cast< int >( a.styleHints()->colorScheme() );
 	hla->addWidget( new QLabel( ns[ s ] ) );
-	QVBoxLayout *vla = new QVBoxLayout;
+	auto vla = new QVBoxLayout;
 	vla->addLayout( hla );
 
+	// Now for the Icon-Listings: with Qt 6.7 Theme Icons were introduced.  Before, there were
+	// QStyle::StandardPixmaps - this lambda creates the standard pixmaps tab
 	auto createSPs = [ & ]()
 	{
-		QWidget *w	= new QWidget;
-		auto	 gl = new FlowLayout();
+		auto w	= new QWidget;
+		auto gl = new FlowLayout();
 		for ( auto i( 0 ); i < QStyle::NStandardPixmap; ++i )
 		{
 			auto tb = new QToolButton( w );
@@ -275,82 +295,13 @@ int main( int argc, char *argv[] )
 			tb->setIcon( StandardIcon::get( static_cast< QStyle::StandardPixmap >( i ) ) );
 			tb->setText( strings[ i ] );
 			tb->setToolButtonStyle( Qt::ToolButtonTextBesideIcon );
-			w->connect(
-				tb, &QToolButton::clicked,
-				[ w, i, tb ]( bool checked )
-				{
-					auto icon  = StandardIcon::get( static_cast< QStyle::StandardPixmap >( i ) );
-					auto sizes = icon.availableSizes();
-					qDebug() << "icon sizes:" << sizes;
-					auto l = new QLabel( nullptr, Qt::WindowType::Tool );
-					l->setAlignment( Qt::AlignCenter );
-					if ( sizes.isEmpty() )
-					{
-						auto  baseIco = qApp->style()->standardIcon( QStyle::SP_DialogYesButton );
-						QIcon myIcon;
-						sizes	 = baseIco.availableSizes();
-						auto psz = sizes.last();
-						psz		 = { 2 * psz.width(), 4 * psz.height() };
-						QPixmap	 pm{ psz };
-						QPainter p( &pm );
-						for ( auto sz : sizes )
-						{
-							qDebug() << "build size:" << sz
-									 << "actual size:" << baseIco.actualSize( sz );
-							auto posy = psz.height() / 8 - ( sz.height() >> 1 );
-							for ( auto [ mode, group ] :
-								  QList< QPair< QIcon::Mode, QPalette::ColorGroup > >{
-									  { QIcon::Normal, QPalette::ColorGroup::Normal },
-									  { QIcon::Disabled, QPalette::ColorGroup::Disabled },
-									  { QIcon::Active, QPalette::ColorGroup::Active },
-									  { QIcon::Selected, QPalette::ColorGroup::Current } } )
-							{
-								p.drawPixmap( QRect{ QPoint{ 0, posy }, sz },
-											  baseIco.pixmap( sz, mode, QIcon::On ) );
-								qreal szf = 4;
-								QPen  p1( p.pen() );
-								p1.setColor( qApp->palette().color(
-									group, QPalette::ColorRole::ButtonText ) );
-								p1.setCapStyle( Qt::RoundCap );
-								QPen p2( p1 );
-								p1.setWidthF( sz.width() / ( 10. ) );
-								p2.setWidthF( sz.width() / ( 20. ) );
-								p2.setColor(
-									qApp->palette().color( group, QPalette::ColorRole::Shadow ) );
-								auto lns = { QLineF( { sz.width() / szf, posy + sz.height() / 2. },
-													 { ( szf - 1 ) * sz.width() / szf,
-													   posy + sz.height() / 2. } ),
-											 QLineF( { sz.width() / 2., posy + sz.height() / szf },
-													 { sz.width() / 2.,
-													   posy + ( szf - 1 ) * sz.height() / szf } ) };
-								for ( auto pe : { p1, p2 } ) p.setPen( pe ), p.drawLines( lns );
-								posy += psz.height() / 4;
-							}
-							p.translate( sz.width(), 0 );
-						}
-						p.end();
-						l->setPixmap( pm );
-					} else l->setPixmap( icon.pixmap( sizes.last(), 2. ) );
-					l->setWindowTitle( tb->text() );
-					l->show();
-				} );
+			// onClick: open a Window showing the Pixmap in all available sizes
 			gl->addWidget( tb );
 		}
-		auto pb = new QPushButton( "only Icons", w );
-		pb->setCheckable( true );
-		w->connect( pb, &QPushButton::clicked,
-					[ w, pb ]( bool checked )
-					{
-						pb->setText( checked ? "Icons with text" : "only Icons" );
-						for ( auto tb : w->findChildren< QToolButton * >() )
-							tb->setToolButtonStyle( checked ? Qt::ToolButtonIconOnly
-															: Qt::ToolButtonTextBesideIcon );
-					} );
-		gl->addWidget( pb );
 		w->setLayout( gl );
 		return w;
 	};
-
+	// Those Theme Icons are new, no need for "open a window to see the icon better"
 	auto createTIs = [ & ]()
 	{
 		auto w	= new QWidget;
@@ -365,28 +316,18 @@ int main( int argc, char *argv[] )
 			tb->setToolButtonStyle( Qt::ToolButtonTextBesideIcon );
 			gl->addWidget( tb );
 		}
-		auto pb = new QPushButton( "only Icons", w );
-		pb->setCheckable( true );
-		w->connect( pb, &QPushButton::clicked,
-					[ w, pb ]( bool checked )
-					{
-						pb->setText( checked ? "Icons with text" : "only Icons" );
-						for ( auto tb : w->findChildren< QToolButton * >() )
-							tb->setToolButtonStyle( checked ? Qt::ToolButtonIconOnly
-															: Qt::ToolButtonTextBesideIcon );
-					} );
-		gl->addWidget( pb );
 		w->setLayout( gl );
 		return w;
 	};
 
+	// finish the UI
 	QTabWidget *tw = new QTabWidget;
 	tw->setWindowTitle( PROJECT_NAME );
 	tw->addTab( createSPs(), "QStyle Standard Pixmaps" );
 	tw->addTab( createTIs(), "QIcon::fromTheme" );
 	vla->addWidget( tw );
-	QWidget w;
 	w.setLayout( vla );
+	w.resize( 800, 600 );
 	w.show();
 	return a.exec();
 }
